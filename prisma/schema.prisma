@@ -1,0 +1,177 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  INTERVIEWER
+  CANDIDATE
+}
+
+enum SessionStatus {
+  SCHEDULED
+  ACTIVE
+  ENDED
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String
+  email          String    @unique
+  passwordHash   String
+  role           Role
+  avatarUrl      String?
+  createdAt      DateTime  @default(now())
+
+  sessionsAsInterviewer Session[]      @relation("InterviewerSessions")
+  sessionsAsCandidate   Session[]      @relation("CandidateSessions")
+  problems              Problem[]
+  chatMessages          ChatMessage[]
+  runs                  RunHistory[]
+  comments              Comment[]
+}
+
+model Session {
+  id             String        @id @default(cuid())
+  title          String
+  status         SessionStatus @default(SCHEDULED)
+  language       String        @default("javascript")
+  scheduledAt    DateTime?
+  startedAt      DateTime?
+  endedAt        DateTime?
+  joinToken      String        @unique
+  joinTokenValid Boolean       @default(true)
+
+  interviewerId  String
+  interviewer    User          @relation("InterviewerSessions", fields: [interviewerId], references: [id])
+  candidateId    String?
+  candidate      User?         @relation("CandidateSessions", fields: [candidateId], references: [id])
+
+  problemId      String?
+  problem        Problem?      @relation(fields: [problemId], references: [id])
+
+  snapshots      CodeSnapshot[]
+  runs           RunHistory[]
+  messages       ChatMessage[]
+  comments       Comment[]
+  notes          InterviewerNote?
+  score          Score?
+  report         SessionReport?
+
+  createdAt      DateTime      @default(now())
+}
+
+model Problem {
+  id            String      @id @default(cuid())
+  title         String
+  difficulty    Difficulty
+  description   String
+  sampleInput   String?
+  sampleOutput  String?
+  hints         String?
+  topicTags     String[]
+  isBuiltIn     Boolean     @default(false)
+  createdById   String?
+  createdBy     User?       @relation(fields: [createdById], references: [id])
+
+  sessions      Session[]
+  createdAt     DateTime    @default(now())
+}
+
+model CodeSnapshot {
+  id          String   @id @default(cuid())
+  sessionId   String
+  session     Session  @relation(fields: [sessionId], references: [id])
+  code        String
+  language    String
+  takenAt     DateTime @default(now())
+
+  @@index([sessionId, takenAt])
+}
+
+model RunHistory {
+  id           String   @id @default(cuid())
+  sessionId    String
+  session      Session  @relation(fields: [sessionId], references: [id])
+  triggeredById String
+  triggeredBy  User     @relation(fields: [triggeredById], references: [id])
+  code         String
+  language     String
+  stdin        String?
+  stdout       String?
+  stderr       String?
+  status       String
+  timeMs       Int?
+  memoryKb     Int?
+  runAt        DateTime @default(now())
+
+  @@index([sessionId, runAt])
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  sessionId  String
+  session    Session  @relation(fields: [sessionId], references: [id])
+  senderId   String
+  sender     User     @relation(fields: [senderId], references: [id])
+  message    String
+  sentAt     DateTime @default(now())
+
+  @@index([sessionId, sentAt])
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  sessionId   String
+  session     Session  @relation(fields: [sessionId], references: [id])
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  lineStart   Int
+  lineEnd     Int
+  body        String
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+model InterviewerNote {
+  id         String   @id @default(cuid())
+  sessionId  String   @unique
+  session    Session  @relation(fields: [sessionId], references: [id])
+  body       String   @default("")
+  updatedAt  DateTime @updatedAt
+}
+
+model Score {
+  id                String   @id @default(cuid())
+  sessionId         String   @unique
+  session           Session  @relation(fields: [sessionId], references: [id])
+  problemSolving    Int
+  codeQuality       Int
+  communication     Int
+  speed             Int
+  overall           Float
+  feedback          String
+  submittedAt       DateTime @default(now())
+}
+
+model SessionReport {
+  id          String   @id @default(cuid())
+  sessionId   String   @unique
+  session     Session  @relation(fields: [sessionId], references: [id])
+  payload     Json
+  pdfUrl      String?
+  generatedAt DateTime @default(now())
+}
