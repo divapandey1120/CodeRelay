@@ -1,7 +1,10 @@
 {
-  "name": "temp-next",
+  "name": "coderelay",
   "version": "0.1.0",
   "private": true,
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
